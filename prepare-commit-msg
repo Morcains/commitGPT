@@ -1,0 +1,35 @@
+#!/bin/bash
+
+OPENAI_API_KEY="YOUR_OPENAI_API_KEY_HERE"
+GPT_MODEL="gpt-3.5-turbo"
+
+# File to which the commit message will be saved
+COMMIT_MSG_FILE=$1
+
+# Get the diff of what's being committed
+DIFF=$(git diff --staged)
+JSON_ESCAPED_DIFF=$(echo "$DIFF" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | awk '{printf "%s\\n", $0}')
+
+# Use curl to post the diff to the OpenAI API and save the response
+RESPONSE=$(curl -s https://api.openai.com/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $OPENAI_API_KEY" \
+    -d "{ \
+    \"model\": \"$GPT_MODEL\", \
+    \"messages\": [ \
+      { \
+        \"role\": \"system\", \
+        \"content\": \"You are a skilled software developer, with a great ability to write concise but clear git commit messages.\" \
+      }, \
+      { \
+        \"role\": \"user\", \
+        \"content\": \"Write a commit message for the following git diff: $JSON_ESCAPED_DIFF\" \
+      } \
+    ] \
+  }")
+
+# Parse the response to extract the text message
+GENERATED_COMMIT_MSG=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+# Save the generated commit message to the commit message file
+echo "$GENERATED_COMMIT_MSG" > "$COMMIT_MSG_FILE"
